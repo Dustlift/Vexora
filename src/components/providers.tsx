@@ -8,7 +8,7 @@ import { arcTestnet } from "@/config/chains";
 import { Toaster } from "sonner";
 
 const config = getDefaultConfig({
-  appName: "Arc Testnet Tools",
+  appName: "Vexora",
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "arc-testnet-tools-local",
   chains: [arcTestnet],
   ssr: true,

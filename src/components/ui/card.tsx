@@ -2,7 +2,7 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg border border-white/10 bg-white/[0.045] p-5 shadow-2xl shadow-black/10", className)} {...props} />;
+  return <div className={cn("rounded-lg border border-cyan-200/10 bg-white/[0.045] p-5 shadow-2xl shadow-black/20 ring-1 ring-violet-300/5", className)} {...props} />;
 }
 
 export function SectionTitle({ title, detail }: { title: string; detail?: string }) {

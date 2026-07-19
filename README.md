@@ -1,6 +1,8 @@
-# Arc Testnet Tools
+# Vexora
 
 Production-oriented technical Web3 workspace for Arc Testnet. The app lets a connected wallet view test USDC/EURC balances, open the official Circle Faucet, prepare USDC/EURC swap checks, validate NFT collection deployments, track mint/admin activity locally, and manage wallet-scoped NFT records.
+
+Live site: `https://openvexora.vercel.app/`
 
 Testnet assets are for testing only and have no real-world monetary value. The application does not include an airdrop, points, TGE, token distribution, or user compensation system.
 
@@ -48,6 +50,7 @@ Set:
 
 - `CIRCLE_KIT_KEY`: Circle Console kit key for App Kit swap operations
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: WalletConnect project id for RainbowKit
+- `NEXT_PUBLIC_APP_URL`: live site URL, currently `https://openvexora.vercel.app`
 - `ARC_TESTNET_RPC_URL`: defaults to the official Arc Testnet RPC
 
 Run locally:

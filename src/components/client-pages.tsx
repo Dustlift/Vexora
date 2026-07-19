@@ -374,7 +374,7 @@ export function MyNftsPage() {
                 <h2 className="text-lg font-semibold text-white">{item.name}</h2>
                 <p>{item.standard} {item.symbol ? `- ${item.symbol}` : ""}</p>
               </div>
-              <a href={explorer.address(item.contractAddress)} target="_blank" rel="noreferrer" className="text-emerald-200"><ExternalLink size={18} /></a>
+              <a href={explorer.address(item.contractAddress)} target="_blank" rel="noreferrer" className="text-cyan-200"><ExternalLink size={18} /></a>
             </div>
             <p>Contract: {shortAddress(item.contractAddress)}</p>
             <p>Owner: {shortAddress(item.ownerAddress)}</p>
