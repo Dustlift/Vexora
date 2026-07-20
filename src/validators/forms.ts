@@ -8,13 +8,6 @@ const positiveDecimal = z
   .regex(/^\d+(\.\d+)?$/, "Enter a valid token amount.")
   .refine((value) => Number(value) >= 0, "Amount cannot be negative.");
 
-export const swapFormSchema = z.object({
-  tokenIn: z.enum(["USDC", "EURC"]),
-  tokenOut: z.enum(["USDC", "EURC"]),
-  amountIn: positiveDecimal.refine((value) => Number(value) > 0, "Amount must be greater than zero."),
-  slippageBps: z.coerce.number().int().min(0).max(1_000),
-});
-
 export const erc721DeploySchema = z.object({
   name: z.string().min(2).max(80),
   symbol: z.string().min(1).max(12),
@@ -48,7 +41,6 @@ export const mintFormSchema = z.object({
   tokenId: z.coerce.number().int().min(0).optional(),
 });
 
-export type SwapFormInput = z.infer<typeof swapFormSchema>;
 export type Erc721DeployInput = z.infer<typeof erc721DeploySchema>;
 export type Erc1155DeployInput = z.infer<typeof erc1155DeploySchema>;
 export type MintFormInput = z.infer<typeof mintFormSchema>;

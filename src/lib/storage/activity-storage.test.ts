@@ -8,7 +8,7 @@ describe("wallet-scoped local storage", () => {
   beforeEach(() => localStorage.clear());
 
   it("stores activity by wallet", () => {
-    addActivity(wallet, { id: "a1", walletAddress: wallet, type: "swap", status: "success", createdAt: new Date().toISOString() });
+    addActivity(wallet, { id: "a1", walletAddress: wallet, type: "faucet_redirect", status: "success", createdAt: new Date().toISOString() });
     expect(getActivities(wallet)).toHaveLength(1);
   });
 

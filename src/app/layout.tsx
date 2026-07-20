@@ -5,7 +5,7 @@ import { Providers } from "@/components/providers";
 export const metadata: Metadata = {
   metadataBase: new URL("https://openvexora.vercel.app"),
   title: "Vexora",
-  description: "Technical Web3 tools for Arc Testnet balances, swaps, NFT deployment, and mint management.",
+  description: "Technical Web3 tools for Arc Testnet balances, NFT deployment, mint management, and NFT transfers.",
   applicationName: "Vexora",
   icons: {
     icon: "/vexora-logo.png",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Vexora",
-    description: "Arc Testnet technical toolkit for balances, swaps, NFT deployment, and mint management.",
+    description: "Arc Testnet technical toolkit for balances, NFT deployment, mint management, and NFT transfers.",
     url: "https://openvexora.vercel.app",
     siteName: "Vexora",
     images: [{ url: "/vexora-logo.png", width: 1024, height: 1024, alt: "Vexora logo" }],

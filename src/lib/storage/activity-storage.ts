@@ -20,7 +20,7 @@ function writeJson<T>(key: string, value: T) {
 }
 
 export function getActivities(wallet?: Address) {
-  return wallet ? readJson<Activity[]>(activityKey(wallet), []) : [];
+  return wallet ? readJson<Activity[]>(activityKey(wallet), []).filter((item) => (item.type as string) !== "swap") : [];
 }
 
 export function addActivity(wallet: Address, activity: Activity) {

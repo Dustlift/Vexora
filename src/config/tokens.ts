@@ -19,8 +19,3 @@ export const ARC_TOKENS = {
     isNativeGasToken: false,
   },
 } as const;
-
-export const TOKEN_PAIR_OPTIONS = [
-  { tokenIn: "USDC", tokenOut: "EURC" },
-  { tokenIn: "EURC", tokenOut: "USDC" },
-] as const;

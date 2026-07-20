@@ -2,7 +2,6 @@ import type { Address, Hex } from "viem";
 import type { SupportedTokenSymbol } from "@/config/tokens";
 
 export type ActivityType =
-  | "swap"
   | "nft_deploy"
   | "nft_mint"
   | "nft_admin_action"
@@ -21,7 +20,6 @@ export type Activity = {
   tokenIn?: SupportedTokenSymbol;
   tokenOut?: SupportedTokenSymbol;
   amountIn?: string;
-  amountOut?: string;
   errorMessage?: string;
   metadataUri?: string;
   recipientAddress?: Address;

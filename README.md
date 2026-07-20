@@ -1,6 +1,6 @@
 # Vexora
 
-Production-oriented technical Web3 workspace for Arc Testnet. The app lets a connected wallet view test USDC/EURC balances, open the official Circle Faucet, prepare USDC/EURC swap checks, validate NFT collection deployments, track mint/admin activity locally, and manage wallet-scoped NFT records.
+Production-oriented technical Web3 workspace for Arc Testnet. The app lets a connected wallet view test USDC/EURC balances, open the official Circle Faucet, deploy NFT collections, mint NFTs, transfer owned NFTs, and manage wallet-scoped NFT records.
 
 Live site: `https://openvexora.vercel.app/`
 
@@ -10,7 +10,6 @@ Testnet assets are for testing only and have no real-world monetary value. The a
 
 - Arc Docs: RPC endpoints and wallet network parameters: `https://docs.arc.io/arc/references/rpc-endpoints`, `https://docs.arc.io/arc/references/connect-to-arc`
 - Arc Docs: contract addresses: `https://docs.arc.io/arc/references/contract-addresses`
-- Arc App Kit Docs: swap and supported chains/tokens: `https://docs.arc.io/app-kit/swap`, `https://docs.arc.io/app-kit/references/supported-blockchains`
 - Circle Docs: EURC testnet address: `https://developers.circle.com/stablecoins/eurc-contract-addresses`
 - OpenZeppelin Contracts 5.x Docs: ERC-721, ERC-1155, ERC-2981, Ownable, ReentrancyGuard.
 
@@ -23,7 +22,6 @@ Testnet assets are for testing only and have no real-world monetary value. The a
 - Native gas token: `USDC` with 18 native decimals
 - USDC ERC-20 interface: `0x3600000000000000000000000000000000000000`, 6 decimals
 - EURC token: `0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a`, 6 decimals
-- Circle App Kit chain identifier: `Arc_Testnet`
 - Faucet: `https://faucet.circle.com/?allow=true`
 
 ## Setup
@@ -48,7 +46,6 @@ cp .env.example .env.local
 
 Set:
 
-- `CIRCLE_KIT_KEY`: Circle Console kit key for App Kit swap operations
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`: WalletConnect project id for RainbowKit
 - `NEXT_PUBLIC_APP_URL`: live site URL, currently `https://openvexora.vercel.app`
 - `ARC_TESTNET_RPC_URL`: defaults to the official Arc Testnet RPC
@@ -70,13 +67,6 @@ Faucet:
 - Open the official Circle Faucet.
 - Select Arc Testnet and the desired test token.
 - Return to the app and refresh balances.
-
-Swap:
-
-- Supported pairs are USDC to EURC and EURC to USDC.
-- The app validates token amounts, Arc Testnet chain ID, and USDC gas reserve.
-- `CIRCLE_KIT_KEY` stays server-side.
-- Live broadcast requires a Circle App Kit viem wallet adapter that can sign with the connected wallet. The current route validates server configuration and request shape.
 
 NFT Deploy:
 
@@ -120,7 +110,7 @@ npm run build
 
 1. Push this project to a Git repository.
 2. Import the repository into Vercel.
-3. Configure `CIRCLE_KIT_KEY`, `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, and `NEXT_PUBLIC_APP_URL`.
+3. Configure `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`, `NEXT_PUBLIC_APP_URL`, and `NEXT_PUBLIC_VEXORA_CREATOR_CONTRACT_ADDRESS`.
 4. Deploy with the default Next.js build command: `npm run build`.
 
 ## Security
@@ -137,6 +127,5 @@ npm run build
 
 ## Known Testnet Constraints
 
-- Arc Testnet may have temporary instability or low liquidity.
+- Arc Testnet may have temporary instability.
 - Faucet limits can change; the app does not present fixed cooldown values unless they are officially documented.
-- Circle App Kit swap execution needs a configured signing adapter. This implementation keeps the kit key server-side and provides the structure for quote validation without embedding secrets.

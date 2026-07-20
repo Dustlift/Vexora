@@ -3,14 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Droplets, GalleryHorizontalEnd, LayoutDashboard, Repeat2, Rocket, UserRound, Wand2 } from "lucide-react";
+import { Activity, Droplets, GalleryHorizontalEnd, LayoutDashboard, Rocket, UserRound, Wand2 } from "lucide-react";
 import { WalletStatus } from "@/components/wallet/wallet-status";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/faucet", label: "Faucet", icon: Droplets },
-  { href: "/swap", label: "Swap", icon: Repeat2 },
   { href: "/deploy", label: "NFT Deploy", icon: Rocket },
   { href: "/mint", label: "Mint NFT", icon: Wand2 },
   { href: "/my-nfts", label: "My NFTs", icon: GalleryHorizontalEnd },

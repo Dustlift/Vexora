@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { Activity, Droplets, GalleryHorizontalEnd, LayoutDashboard, Repeat2, Rocket, UserRound, Wand2, type LucideIcon } from "lucide-react";
+import { Activity, Droplets, GalleryHorizontalEnd, LayoutDashboard, Rocket, UserRound, Wand2, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 
 const links: Array<{ href: string; title: string; icon: LucideIcon }> = [
   { href: "/dashboard", title: "Dashboard", icon: LayoutDashboard },
   { href: "/faucet", title: "Faucet", icon: Droplets },
-  { href: "/swap", title: "Swap", icon: Repeat2 },
   { href: "/deploy", title: "NFT Deploy", icon: Rocket },
   { href: "/mint", title: "Mint NFT", icon: Wand2 },
   { href: "/my-nfts", title: "My NFTs", icon: GalleryHorizontalEnd },
@@ -20,7 +19,7 @@ export default function Home() {
         <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Vexora Arc Testnet toolkit</p>
         <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-white md:text-6xl">Choose an Arc Testnet operation.</h1>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">
-          Arc Testnet uzerinde test token bakiyelerinizi goruntuleyin, USDC ve EURC arasinda swap yapin, NFT koleksiyonlari deploy edin ve NFT mint islemlerini yonetin.
+          Arc Testnet uzerinde test token bakiyelerinizi goruntuleyin, NFT koleksiyonlari deploy edin, mint islemlerini yonetin ve sahip oldugunuz NFTleri transfer edin.
         </p>
       </section>
       <section className="grid gap-4 pb-10 pt-6 sm:grid-cols-2 lg:grid-cols-4">
