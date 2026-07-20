@@ -41,6 +41,7 @@ export type DeployedNftCollection = {
   name: string;
   symbol?: string;
   baseUri: string;
+  imageUri?: string;
   maxSupply: string;
   minted?: string;
   publicMint?: boolean;

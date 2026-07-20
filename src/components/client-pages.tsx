@@ -264,6 +264,7 @@ export function DeployPage() {
     name: "",
     symbol: "",
     baseUri: "",
+    imageUri: "",
     maxSupply: "",
     mintPrice: "0",
     maxPerWallet: "",
@@ -328,6 +329,7 @@ export function DeployPage() {
         name: parsed.name,
         symbol: "symbol" in parsed ? parsed.symbol : undefined,
         baseUri: parsed.baseUri,
+        imageUri: form.imageUri || undefined,
         maxSupply: String(parsed.maxSupply),
         minted: "0",
         publicMint: "publicMint" in parsed ? parsed.publicMint : true,
@@ -360,6 +362,7 @@ export function DeployPage() {
           <label className="text-sm text-slate-300">Collection name<Input value={form.name} placeholder="Collection name" onChange={(event) => update("name", event.target.value)} /></label>
           {standard === "ERC721" ? <label className="text-sm text-slate-300">Symbol<Input value={form.symbol} placeholder="SYMBOL" onChange={(event) => update("symbol", event.target.value)} /></label> : null}
           <label className="text-sm text-slate-300">Base URI<Input value={form.baseUri} placeholder="ipfs://metadata/" onChange={(event) => update("baseUri", event.target.value)} /></label>
+          <label className="text-sm text-slate-300">Collection image<Input value={form.imageUri} placeholder="ipfs://image.png or https://..." onChange={(event) => update("imageUri", event.target.value)} /></label>
           {standard === "ERC1155" ? <label className="text-sm text-slate-300">Token ID<Input value={form.tokenId} onChange={(event) => update("tokenId", event.target.value)} /></label> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <label className="text-sm text-slate-300">Maximum supply<Input value={form.maxSupply} placeholder="10000" onChange={(event) => update("maxSupply", event.target.value)} /></label>
@@ -427,7 +430,7 @@ export function MintPage() {
         contractAddress: parsed.contractAddress,
         tokenId: standard === "ERC1155" ? String(parsed.tokenId || 0) : undefined,
         txHash: hash,
-        metadataUri: localCollection?.baseUri || (useSiteCollection ? VEXORA_CREATOR_COLLECTION.image : undefined),
+        metadataUri: localCollection?.imageUri || localCollection?.baseUri || (useSiteCollection ? VEXORA_CREATOR_COLLECTION.image : undefined),
         createdAt: new Date().toISOString(),
       };
       addActivity(address, activity);
@@ -490,6 +493,7 @@ export function MyNftsPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {minted.map((item) => (
           <Card key={item.id} className="grid gap-2 text-sm text-slate-300">
+            {item.metadataUri ? <Image src={item.metadataUri} alt="Minted NFT" width={640} height={360} className="h-48 w-full rounded-md object-cover" unoptimized /> : null}
             <h2 className="text-lg font-semibold text-white">Minted NFT</h2>
             <p>Contract: {item.contractAddress ? shortAddress(item.contractAddress) : "-"}</p>
             <p>Token ID: {item.tokenId || "see transaction logs"}</p>
@@ -499,6 +503,7 @@ export function MyNftsPage() {
         ))}
         {collections.map((item: DeployedNftCollection) => (
           <Card key={item.id} className="grid gap-2 text-sm text-slate-300">
+            {item.imageUri ? <Image src={item.imageUri} alt={item.name} width={640} height={360} className="h-48 w-full rounded-md object-cover" unoptimized /> : null}
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-white">{item.name}</h2>
@@ -509,6 +514,7 @@ export function MyNftsPage() {
             <p>Contract: {shortAddress(item.contractAddress)}</p>
             <p>Owner: {shortAddress(item.ownerAddress)}</p>
             <p>Maximum supply: {item.maxSupply}</p>
+            {item.imageUri ? <p>Image: {item.imageUri}</p> : null}
             <p>Public mint: {item.publicMint ? "open" : "closed"}</p>
             <p>Royalty: {item.royaltyBps / 100}% to {shortAddress(item.royaltyReceiver)}</p>
             {address?.toLowerCase() === item.ownerAddress.toLowerCase() ? <p className="text-cyan-100">Owner controls are available through the deployed contract wallet interface.</p> : null}
