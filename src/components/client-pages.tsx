@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, RefreshCcw, Repeat2, Send } from "lucide-react";
 import { createPublicClient, http, isAddress, isHex, type Address, type EIP1193Provider } from "viem";
 import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
@@ -181,9 +181,12 @@ export function SwapPage() {
   const [tokenIn, setTokenIn] = useState<SupportedTokenSymbol>("USDC");
   const [amountIn, setAmountIn] = useState("1.00");
   const [state, setState] = useState<OperationState>("idle");
-  const [estimatedOut, setEstimatedOut] = useState("");
-  const [minimumOut, setMinimumOut] = useState("");
-  const [quoteMessage, setQuoteMessage] = useState("Enter an amount to get a live quote.");
+  const [quote, setQuote] = useState({
+    amountOut: "",
+    minimumOut: "",
+    message: "Enter an amount to get a live quote.",
+    key: "",
+  });
   const tokenOut: SupportedTokenSymbol = tokenIn === "USDC" ? "EURC" : "USDC";
   const slippagePercent = DEFAULT_SLIPPAGE_BPS / 100;
   const balance = tokenIn === "USDC" ? balances.USDC : balances.EURC;
@@ -203,9 +206,15 @@ export function SwapPage() {
     });
   }
 
-  async function requestQuote() {
+  const quoteKey = `${tokenIn}:${tokenOut}:${amountIn}:${balance}:${address || ""}:${chainId}`;
+  const estimatedOut = quote.key === quoteKey ? quote.amountOut : "";
+  const minimumOut = quote.key === quoteKey ? quote.minimumOut : "";
+  const quoteMessage = !address ? "Connect a wallet to get a live quote." : quote.key === quoteKey || !quote.key ? quote.message : "Updating quote...";
+
+  const requestQuote = useCallback(async (options: { silent?: boolean } = {}) => {
     try {
       setState("loading");
+      setQuote({ amountOut: "", minimumOut: "", message: "Updating quote...", key: quoteKey });
       swapFormSchema.parse({ tokenIn, tokenOut, amountIn, slippageBps: DEFAULT_SLIPPAGE_BPS });
       if (!address) throw new Error("Connect a wallet first.");
       if (chainId !== ARC_TESTNET_CHAIN_ID) throw new Error("Switch to Arc Testnet before getting a quote.");
@@ -218,18 +227,24 @@ export function SwapPage() {
       });
       const quote = await res.json();
       if (!res.ok) throw new Error(quote.error || "Circle quote unavailable.");
-      setEstimatedOut(quote.amountOut);
-      setMinimumOut(quote.minimumOut);
-      setQuoteMessage("Live quote ready.");
+      setQuote({ amountOut: quote.amountOut, minimumOut: quote.minimumOut, message: "Live quote ready.", key: quoteKey });
       setState("success");
     } catch (error) {
-      setEstimatedOut("");
-      setMinimumOut("");
-      setQuoteMessage(toUserFacingError(error));
+      setQuote({ amountOut: "", minimumOut: "", message: toUserFacingError(error), key: quoteKey });
       setState("error");
-      toast.error(toUserFacingError(error));
+      if (!options.silent) toast.error(toUserFacingError(error));
     }
-  }
+  }, [address, amountIn, balance, chainId, quoteKey, tokenIn, tokenOut]);
+
+  useEffect(() => {
+    if (!address || chainId !== ARC_TESTNET_CHAIN_ID || Number(amountIn) <= 0) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void requestQuote({ silent: true });
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [address, amountIn, balance, chainId, requestQuote, tokenIn, tokenOut]);
 
   async function submitSwap() {
     try {
@@ -268,7 +283,7 @@ export function SwapPage() {
       toast.success("Swap submitted on Arc Testnet.");
     } catch (error) {
       setState("error");
-      setQuoteMessage(toUserFacingError(error));
+      setQuote((current) => ({ ...current, message: toUserFacingError(error) }));
       toast.error(toUserFacingError(error));
     }
   }
@@ -309,10 +324,7 @@ export function SwapPage() {
             <p className="mt-2 text-xs text-slate-400">Minimum {minimumOut || "-"} {tokenOut}</p>
           </div>
           <p className="text-sm text-slate-300">{quoteMessage}</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button onClick={requestQuote} disabled={state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"} className="border-white/15 bg-white/10 text-white hover:bg-white/15">
-              Get quote
-            </Button>
+          <div className="grid gap-2">
             <Button onClick={submitSwap} disabled={!estimatedOut || state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"} className="bg-gradient-to-r from-violet-400 via-indigo-500 to-cyan-300">
             Swap
             </Button>
