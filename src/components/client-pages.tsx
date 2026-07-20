@@ -449,12 +449,12 @@ export function MintPage() {
       <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
         <Card className="grid gap-4">
           <div className="overflow-hidden rounded-md border border-cyan-200/10 bg-slate-950/60">
-            <Image src={VEXORA_CREATOR_COLLECTION.image} alt="Vexora Early Creator" width={720} height={420} className="h-56 w-full object-cover" />
+            <Image src={VEXORA_CREATOR_COLLECTION.image} alt="Vexora Test Mint" width={720} height={420} className="h-56 w-full object-cover" />
             <div className="grid gap-2 p-4">
               <h2 className="text-xl font-semibold text-white">{VEXORA_CREATOR_COLLECTION.name}</h2>
               <p className="text-sm text-slate-300">Supply {VEXORA_CREATOR_COLLECTION.maxSupply.toLocaleString()} - mint price 0, network fee only.</p>
               <Button onClick={() => mintNft(true)} disabled={!siteCollectionAddress || state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"}>
-                Mint Early Creator
+                Mint Test NFT
               </Button>
               {!siteCollectionAddress ? <p className="text-xs text-amber-200">This collection is being prepared for public mint.</p> : null}
             </div>
