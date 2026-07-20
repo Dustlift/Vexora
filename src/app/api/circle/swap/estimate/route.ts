@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { AppKit } from "@circle-fin/app-kit";
 import { ARC_CIRCLE_CHAIN_IDENTIFIER } from "@/config/chains";
+import { ARC_TOKENS } from "@/config/tokens";
 import { swapFormSchema } from "@/validators/forms";
 
 export async function POST(request: Request) {
@@ -14,13 +16,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid Arc Testnet swap request." }, { status: 400 });
   }
 
+  const kit = new AppKit();
+  const rates = await kit.getTokenRates({
+    chain: ARC_CIRCLE_CHAIN_IDENTIFIER,
+    tokens: [parsed.data.tokenIn, parsed.data.tokenOut],
+    kitKey: key,
+  });
+  const chainRates = rates.rates[ARC_CIRCLE_CHAIN_IDENTIFIER] || {};
+  const tokenInRate = chainRates[ARC_TOKENS[parsed.data.tokenIn].address.toLowerCase()];
+  const tokenOutRate = chainRates[ARC_TOKENS[parsed.data.tokenOut].address.toLowerCase()];
+  if (!tokenInRate?.priceUSD || !tokenOutRate?.priceUSD) {
+    return NextResponse.json({ error: "Circle rate is unavailable for this Arc Testnet pair." }, { status: 503 });
+  }
+  const amountOut = (Number(parsed.data.amountIn) * Number(tokenInRate.priceUSD)) / Number(tokenOutRate.priceUSD);
+  const minimumOut = amountOut * (1 - parsed.data.slippageBps / 10_000);
+
   return NextResponse.json({
     chain: ARC_CIRCLE_CHAIN_IDENTIFIER,
     tokenIn: parsed.data.tokenIn,
     tokenOut: parsed.data.tokenOut,
     amountIn: parsed.data.amountIn,
+    amountOut: amountOut.toFixed(6),
+    minimumOut: minimumOut.toFixed(6),
     slippageBps: parsed.data.slippageBps,
-    kitKeyConfigured: true,
-    note: "Use Circle App Kit with a viem wallet adapter on the signing side; the kit key remains server-side.",
+    rateInUsd: tokenInRate.priceUSD,
+    rateOutUsd: tokenOutRate.priceUSD,
+    fetchedAt: tokenOutRate.fetchedAt || tokenInRate.fetchedAt,
   });
 }

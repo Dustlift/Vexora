@@ -81,10 +81,6 @@ function ActivityList({ activities }: { activities: Activity[] }) {
   );
 }
 
-function selectedCollection(collections: DeployedNftCollection[], address: string) {
-  return collections.find((item) => item.contractAddress.toLowerCase() === address.toLowerCase());
-}
-
 function validCollection(item: DeployedNftCollection) {
   return isAddress(item.contractAddress) && item.ownerAddress.toLowerCase() !== ZERO_ADDRESS && item.royaltyReceiver.toLowerCase() !== ZERO_ADDRESS;
 }
@@ -215,18 +211,15 @@ export function SwapPage() {
       if (chainId !== ARC_TESTNET_CHAIN_ID) throw new Error("Switch to Arc Testnet before getting a quote.");
       if (Number(amountIn) > Number(balance)) throw new Error("Insufficient token balance.");
       if (tokenIn === "USDC" && Number(balance) - Number(amountIn) < 0.25) throw new Error("Keep a USDC reserve for gas.");
-      const [{ AppKit }] = await Promise.all([import("@circle-fin/app-kit")]);
-      const adapter = await buildSwapAdapter();
-      const kit = new AppKit();
-      const estimate = await kit.estimateSwap({
-        from: { adapter, chain: ARC_CIRCLE_CHAIN_IDENTIFIER },
-        tokenIn,
-        tokenOut,
-        amountIn,
-        config: { slippageBps: DEFAULT_SLIPPAGE_BPS },
+      const res = await fetch("/api/circle/swap/estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenIn, tokenOut, amountIn, slippageBps: DEFAULT_SLIPPAGE_BPS, chain: ARC_CIRCLE_CHAIN_IDENTIFIER }),
       });
-      setEstimatedOut(estimate.estimatedOutput.amount);
-      setMinimumOut(estimate.stopLimit.amount);
+      const quote = await res.json();
+      if (!res.ok) throw new Error(quote.error || "Circle quote unavailable.");
+      setEstimatedOut(quote.amountOut);
+      setMinimumOut(quote.minimumOut);
       setQuoteMessage("Live quote ready.");
       setState("success");
     } catch (error) {
@@ -470,34 +463,28 @@ export function DeployPage() {
 }
 
 export function MintPage() {
-  const { address, collections, refreshLocal } = useWalletScopedData();
+  const { address, refreshLocal } = useWalletScopedData();
   const chainId = useChainId();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
   const siteCollectionAddress = normalizeConfiguredAddress(VEXORA_CREATOR_COLLECTION.contractAddress);
-  const [contractAddress, setContractAddress] = useState<string>(siteCollectionAddress || collections[0]?.contractAddress || "");
-  const [standard, setStandard] = useState<NftStandard>("ERC721");
   const [quantity, setQuantity] = useState("1");
-  const [tokenId, setTokenId] = useState("0");
   const [state, setState] = useState<OperationState>("idle");
-  const localCollection = selectedCollection(collections, contractAddress);
 
-  async function mintNft(useSiteCollection = false) {
+  async function mintNft() {
     try {
       setState("loading");
       if (!address || !walletClient || !publicClient) throw new Error("Connect a wallet first.");
       if (chainId !== ARC_TESTNET_CHAIN_ID) throw new Error("Switch to Arc Testnet before minting.");
-      const target = useSiteCollection ? siteCollectionAddress : (contractAddress as Address);
-      if (!target || !isAddress(target)) throw new Error(useSiteCollection ? "The Vexora collection is not ready for public mint yet." : "Enter a valid contract address.");
-      const parsed = mintFormSchema.parse({ contractAddress: target, quantity: Number(quantity), tokenId: Number(tokenId) });
-      const abi = standard === "ERC1155" ? erc1155Abi : erc721Abi;
-      const price = await publicClient.readContract({ address: parsed.contractAddress, abi, functionName: "mintPrice" }).catch(() => BigInt(0));
+      if (!siteCollectionAddress || !isAddress(siteCollectionAddress)) throw new Error("The Vexora collection is not ready for public mint yet.");
+      const parsed = mintFormSchema.parse({ contractAddress: siteCollectionAddress, quantity: Number(quantity) });
+      const price = await publicClient.readContract({ address: parsed.contractAddress, abi: erc721Abi, functionName: "mintPrice" }).catch(() => BigInt(0));
       const value = (price as bigint) * BigInt(parsed.quantity);
       setState("wallet_confirmation");
       const hash = await walletClient.writeContract({
         account: address,
         address: parsed.contractAddress,
-        abi,
+        abi: erc721Abi,
         functionName: "mint",
         args: [BigInt(parsed.quantity)],
         value,
@@ -510,9 +497,8 @@ export function MintPage() {
         type: "nft_mint",
         status: "success",
         contractAddress: parsed.contractAddress,
-        tokenId: standard === "ERC1155" ? String(parsed.tokenId || 0) : undefined,
         txHash: hash,
-        metadataUri: localCollection?.imageUri || localCollection?.baseUri || (useSiteCollection ? VEXORA_CREATOR_COLLECTION.image : undefined),
+        metadataUri: VEXORA_CREATOR_COLLECTION.image,
         createdAt: new Date().toISOString(),
       };
       addActivity(address, activity);
@@ -535,29 +521,17 @@ export function MintPage() {
             <div className="grid gap-2 p-4">
               <h2 className="text-xl font-semibold text-white">{VEXORA_CREATOR_COLLECTION.name}</h2>
               <p className="text-sm text-slate-300">Supply {VEXORA_CREATOR_COLLECTION.maxSupply.toLocaleString()} - mint price 0, network fee only.</p>
-              <Button onClick={() => mintNft(true)} disabled={!siteCollectionAddress || state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"}>
+              <Button onClick={mintNft} disabled={!siteCollectionAddress || state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"}>
                 Mint Test NFT
               </Button>
               {!siteCollectionAddress ? <p className="text-xs text-amber-200">This collection is being prepared for public mint.</p> : null}
             </div>
           </div>
-          <label className="text-sm text-slate-300">
-            Local collection
-            <Select value={contractAddress} onChange={(event) => setContractAddress(event.target.value)}>
-              <option value="">Manual address</option>
-              {collections.map((item) => <option key={item.id} value={item.contractAddress}>{item.name}</option>)}
-            </Select>
-          </label>
-          <label className="text-sm text-slate-300">Standard<Select value={standard} onChange={(event) => setStandard(event.target.value as NftStandard)}><option>ERC721</option><option>ERC1155</option></Select></label>
-          <label className="text-sm text-slate-300">Contract address<Input value={contractAddress} onChange={(event) => setContractAddress(event.target.value)} /></label>
           <label className="text-sm text-slate-300">Quantity<Input value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
-          {standard === "ERC1155" ? <label className="text-sm text-slate-300">ERC-1155 token ID<Input value={tokenId} onChange={(event) => setTokenId(event.target.value)} /></label> : null}
-          <Button onClick={() => mintNft(false)}>Mint selected collection</Button>
         </Card>
         <Card className="grid gap-3 text-sm text-slate-300">
           <p>Status: <span className="text-white">{statusText[state]}</span></p>
           <p>Vexora collection: <span className="text-white">{siteCollectionAddress ? shortAddress(siteCollectionAddress) : "preparing"}</span></p>
-          <p>Selected contract: <span className="text-white">{isAddress(contractAddress) ? shortAddress(contractAddress as Address) : "none"}</span></p>
           <p>Every successful mint records the transaction hash and contract address in the connected wallet profile.</p>
         </Card>
       </div>
