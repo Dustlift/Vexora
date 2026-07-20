@@ -19,6 +19,14 @@ function findImport(importPath) {
   return { error: `File not found: ${importPath}` };
 }
 
+function toAsciiJson(value) {
+  return JSON.stringify(value, null, 2)
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, "\"")
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/[^\x00-\x7F]/g, "");
+}
+
 const sources = Object.fromEntries(
   contracts.map((file) => [
     file,
@@ -52,18 +60,14 @@ for (const [sourceFile, compiled] of Object.entries(output.contracts)) {
     if (!contractName.startsWith("ArcErc")) continue;
     fs.writeFileSync(
       path.join(outputDir, `${contractName}.json`),
-      JSON.stringify(
-        {
-          contractName,
-          sourceName: sourceFile,
-          compilerVersion: solc.version(),
-          abi: artifact.abi,
-          bytecode: `0x${artifact.evm.bytecode.object}`,
-          metadata: JSON.parse(artifact.metadata),
-        },
-        null,
-        2,
-      ),
+      toAsciiJson({
+        contractName,
+        sourceName: sourceFile,
+        compilerVersion: solc.version(),
+        abi: artifact.abi,
+        bytecode: `0x${artifact.evm.bytecode.object}`,
+        metadata: JSON.parse(artifact.metadata),
+      }),
     );
   }
 }

@@ -1929,7 +1929,7 @@
           ],
           "ERC1155MissingApprovalForAll(address,address)": [
             {
-              "details": "Indicates a failure with the `operator`’s approval. Used in transfers.",
+              "details": "Indicates a failure with the `operator`'s approval. Used in transfers.",
               "params": {
                 "operator": "Address that may be allowed to operate on tokens without being their owner.",
                 "owner": "Address of the current owner of a token."

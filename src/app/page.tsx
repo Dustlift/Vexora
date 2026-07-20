@@ -17,9 +17,9 @@ export default function Home() {
     <AppShell>
       <section className="py-4">
         <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Vexora Arc Testnet toolkit</p>
-        <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-white md:text-6xl">Choose an Arc Testnet operation.</h1>
+        <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-white md:text-6xl">Choose a Vexora operation.</h1>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">
-          Arc Testnet uzerinde test token bakiyelerinizi goruntuleyin, NFT koleksiyonlari deploy edin, mint islemlerini yonetin ve sahip oldugunuz NFTleri transfer edin.
+          View test token balances, deploy NFT collections, manage minting, and transfer owned NFTs.
         </p>
       </section>
       <section className="grid gap-4 pb-10 pt-6 sm:grid-cols-2 lg:grid-cols-4">
