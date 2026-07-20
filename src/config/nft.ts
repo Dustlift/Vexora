@@ -7,6 +7,6 @@ export const VEXORA_CREATOR_COLLECTION = {
   symbol: "VEC",
   maxSupply: 10_000,
   mintPrice: "0",
-  image: "/vexora-logo.png",
+  image: "/vexora-early-creator.svg",
   contractAddress: process.env.NEXT_PUBLIC_VEXORA_CREATOR_CONTRACT_ADDRESS as Address | undefined,
 };

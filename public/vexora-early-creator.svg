@@ -1,0 +1,16 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="1200" fill="#030612"/>
+  <rect x="60" y="60" width="1080" height="1080" rx="48" fill="#07111F" stroke="#38D7FF" stroke-opacity="0.22" stroke-width="2"/>
+  <rect x="140" y="210" width="920" height="520" rx="24" fill="#060A18" stroke="#8E45FF" stroke-opacity="0.36" stroke-width="2"/>
+  <path d="M180 295H1020" stroke="url(#vexora-line)" stroke-width="4"/>
+  <path d="M180 645H1020" stroke="url(#vexora-line)" stroke-width="4"/>
+  <text x="600" y="432" text-anchor="middle" fill="#F8FBFF" font-family="Arial, Helvetica, sans-serif" font-size="118" font-weight="700" letter-spacing="0">VEXORA</text>
+  <text x="600" y="548" text-anchor="middle" fill="#7CEBFF" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="600" letter-spacing="0">Early Creator</text>
+  <text x="600" y="860" text-anchor="middle" fill="#C9D8FF" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="500" letter-spacing="0">Arc Testnet Collection</text>
+  <defs>
+    <linearGradient id="vexora-line" x1="180" y1="295" x2="1020" y2="295" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8E45FF"/>
+      <stop offset="1" stop-color="#20C8FF"/>
+    </linearGradient>
+  </defs>
+</svg>

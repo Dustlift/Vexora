@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { Copy, ExternalLink, RefreshCcw, Repeat2, Send, Sparkles } from "lucide-react";
+import { Copy, ExternalLink, RefreshCcw, Repeat2, Send } from "lucide-react";
 import { isAddress, type Address } from "viem";
 import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
 import { AppShell } from "@/components/app-shell";
@@ -39,10 +39,6 @@ const statusText: Record<OperationState, string> = {
   success: "Success",
   error: "Error",
 };
-
-function connectedAddress(address?: Address) {
-  return address || "0x0000000000000000000000000000000000000000";
-}
 
 function useWalletScopedData() {
   const { address } = useAccount();
@@ -265,15 +261,15 @@ export function DeployPage() {
   const [standard, setStandard] = useState<NftStandard>("ERC721");
   const [state, setState] = useState<OperationState>("idle");
   const [form, setForm] = useState({
-    name: "Vexora Early Creator",
-    symbol: "VEC",
-    baseUri: "ipfs://metadata/",
-    maxSupply: "10000",
+    name: "",
+    symbol: "",
+    baseUri: "",
+    maxSupply: "",
     mintPrice: "0",
-    maxPerWallet: "5",
-    royaltyBps: "250",
-    royaltyReceiver: connectedAddress(address),
-    owner: connectedAddress(address),
+    maxPerWallet: "",
+    royaltyBps: "0",
+    royaltyReceiver: "",
+    owner: "",
     tokenId: "0",
     publicMint: true,
     ownerFreeMint: true,
@@ -284,32 +280,21 @@ export function DeployPage() {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function useSiteCollectionPreset() {
-    setStandard("ERC721");
-    setForm((current) => ({
-      ...current,
-      name: VEXORA_CREATOR_COLLECTION.name,
-      symbol: VEXORA_CREATOR_COLLECTION.symbol,
-      baseUri: "ipfs://vexora-early-creator/",
-      maxSupply: String(VEXORA_CREATOR_COLLECTION.maxSupply),
-      mintPrice: VEXORA_CREATOR_COLLECTION.mintPrice,
-      maxPerWallet: "1",
-      royaltyReceiver: connectedAddress(address),
-      owner: connectedAddress(address),
-      publicMint: true,
-    }));
-  }
-
   async function deployCollection() {
     try {
       setState("loading");
       if (!address || !walletClient || !publicClient) throw new Error("Connect a wallet first.");
       if (chainId !== ARC_TESTNET_CHAIN_ID) throw new Error("Switch to Arc Testnet before deploying.");
+      const deployValues = {
+        ...form,
+        owner: form.owner || address,
+        royaltyReceiver: form.royaltyReceiver || address,
+      };
       setState("wallet_confirmation");
       const parsed =
         standard === "ERC721"
-          ? erc721DeploySchema.parse({ ...form, maxSupply: Number(form.maxSupply), maxPerWallet: Number(form.maxPerWallet), royaltyBps: Number(form.royaltyBps) })
-          : erc1155DeploySchema.parse({ ...form, tokenId: Number(form.tokenId), maxSupply: Number(form.maxSupply), maxPerWallet: Number(form.maxPerWallet), royaltyBps: Number(form.royaltyBps) });
+          ? erc721DeploySchema.parse({ ...deployValues, maxSupply: Number(form.maxSupply), maxPerWallet: Number(form.maxPerWallet), royaltyBps: Number(form.royaltyBps) })
+          : erc1155DeploySchema.parse({ ...deployValues, tokenId: Number(form.tokenId), maxSupply: Number(form.maxSupply), maxPerWallet: Number(form.maxPerWallet), royaltyBps: Number(form.royaltyBps) });
       const hash =
         standard === "ERC721"
           ? await walletClient.deployContract({
@@ -317,7 +302,7 @@ export function DeployPage() {
               abi: erc721Abi,
               bytecode: erc721Bytecode,
               args: erc721ConstructorArgs(
-                erc721DeploySchema.parse({ ...form, maxSupply: Number(form.maxSupply), maxPerWallet: Number(form.maxPerWallet), royaltyBps: Number(form.royaltyBps) }),
+                erc721DeploySchema.parse({ ...deployValues, maxSupply: Number(form.maxSupply), maxPerWallet: Number(form.maxPerWallet), royaltyBps: Number(form.royaltyBps) }),
               ),
             })
           : await walletClient.deployContract({
@@ -325,7 +310,7 @@ export function DeployPage() {
               abi: erc1155Abi,
               bytecode: erc1155Bytecode,
               args: erc1155ConstructorArgs(
-                erc1155DeploySchema.parse({ ...form, tokenId: Number(form.tokenId), maxSupply: Number(form.maxSupply), maxPerWallet: Number(form.maxPerWallet), royaltyBps: Number(form.royaltyBps) }),
+                erc1155DeploySchema.parse({ ...deployValues, tokenId: Number(form.tokenId), maxSupply: Number(form.maxSupply), maxPerWallet: Number(form.maxPerWallet), royaltyBps: Number(form.royaltyBps) }),
               ),
             });
       setState("transaction_pending");
@@ -362,33 +347,28 @@ export function DeployPage() {
 
   return (
     <AppShell>
-      <SectionTitle title="NFT Deploy" detail="Deploy template-based ERC-721 or ERC-1155 collections directly from your connected wallet on Arc Testnet." />
+      <SectionTitle title="NFT Deploy" detail="Create an ERC-721 or ERC-1155 collection directly from your connected wallet on Arc Testnet." />
       <div className="grid gap-5 lg:grid-cols-[1fr_0.8fr]">
         <Card className="grid gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <label className="min-w-56 flex-1 text-sm text-slate-300">
-              Standard
-              <Select value={standard} onChange={(event) => setStandard(event.target.value as NftStandard)}>
-                <option>ERC721</option>
-                <option>ERC1155</option>
-              </Select>
-            </label>
-            <Button type="button" onClick={useSiteCollectionPreset} className="border-white/15 bg-white/10 text-white hover:bg-white/15">
-              <Sparkles size={16} /> Early Creator preset
-            </Button>
-          </div>
-          <label className="text-sm text-slate-300">Collection name<Input value={form.name} onChange={(event) => update("name", event.target.value)} /></label>
-          {standard === "ERC721" ? <label className="text-sm text-slate-300">Symbol<Input value={form.symbol} onChange={(event) => update("symbol", event.target.value)} /></label> : null}
-          <label className="text-sm text-slate-300">Base URI<Input value={form.baseUri} onChange={(event) => update("baseUri", event.target.value)} /></label>
+          <label className="text-sm text-slate-300">
+            Standard
+            <Select value={standard} onChange={(event) => setStandard(event.target.value as NftStandard)}>
+              <option>ERC721</option>
+              <option>ERC1155</option>
+            </Select>
+          </label>
+          <label className="text-sm text-slate-300">Collection name<Input value={form.name} placeholder="Collection name" onChange={(event) => update("name", event.target.value)} /></label>
+          {standard === "ERC721" ? <label className="text-sm text-slate-300">Symbol<Input value={form.symbol} placeholder="SYMBOL" onChange={(event) => update("symbol", event.target.value)} /></label> : null}
+          <label className="text-sm text-slate-300">Base URI<Input value={form.baseUri} placeholder="ipfs://metadata/" onChange={(event) => update("baseUri", event.target.value)} /></label>
           {standard === "ERC1155" ? <label className="text-sm text-slate-300">Token ID<Input value={form.tokenId} onChange={(event) => update("tokenId", event.target.value)} /></label> : null}
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="text-sm text-slate-300">Maximum supply<Input value={form.maxSupply} onChange={(event) => update("maxSupply", event.target.value)} /></label>
-            <label className="text-sm text-slate-300">Max per wallet<Input value={form.maxPerWallet} onChange={(event) => update("maxPerWallet", event.target.value)} /></label>
+            <label className="text-sm text-slate-300">Maximum supply<Input value={form.maxSupply} placeholder="10000" onChange={(event) => update("maxSupply", event.target.value)} /></label>
+            <label className="text-sm text-slate-300">Max per wallet<Input value={form.maxPerWallet} placeholder="5" onChange={(event) => update("maxPerWallet", event.target.value)} /></label>
             <label className="text-sm text-slate-300">Mint price<Input value={form.mintPrice} onChange={(event) => update("mintPrice", event.target.value)} /></label>
             <label className="text-sm text-slate-300">Royalty bps<Input value={form.royaltyBps} onChange={(event) => update("royaltyBps", event.target.value)} /></label>
           </div>
-          <label className="text-sm text-slate-300">Royalty receiver<Input value={form.royaltyReceiver} onChange={(event) => update("royaltyReceiver", event.target.value)} /></label>
-          <label className="text-sm text-slate-300">Contract owner<Input value={form.owner} onChange={(event) => update("owner", event.target.value)} /></label>
+          <label className="text-sm text-slate-300">Royalty receiver<Input value={form.royaltyReceiver} placeholder="Connected wallet by default" onChange={(event) => update("royaltyReceiver", event.target.value)} /></label>
+          <label className="text-sm text-slate-300">Contract owner<Input value={form.owner} placeholder="Connected wallet by default" onChange={(event) => update("owner", event.target.value)} /></label>
           <Button onClick={deployCollection} disabled={state === "wallet_confirmation" || state === "transaction_pending" || state === "loading"}>
             Deploy collection
           </Button>
@@ -396,8 +376,8 @@ export function DeployPage() {
         <Card className="grid gap-3 text-sm text-slate-300">
           <p>Status: <span className="text-white">{statusText[state]}</span></p>
           <p>Gas asset: native USDC, not ETH.</p>
-          <p>Deploy result is saved locally with contract address, transaction hash, owner, supply, royalty, and mint settings.</p>
-          <p>For the public Vexora collection, deploy the Early Creator preset once, then set its address as <span className="text-white">NEXT_PUBLIC_VEXORA_CREATOR_CONTRACT_ADDRESS</span> on Vercel.</p>
+          <p>Deploy result is saved to this browser after the wallet transaction is confirmed.</p>
+          <p>Owner and royalty receiver use the connected wallet when left blank.</p>
         </Card>
       </div>
     </AppShell>
@@ -423,7 +403,7 @@ export function MintPage() {
       if (!address || !walletClient || !publicClient) throw new Error("Connect a wallet first.");
       if (chainId !== ARC_TESTNET_CHAIN_ID) throw new Error("Switch to Arc Testnet before minting.");
       const target = useSiteCollection ? siteCollectionAddress : (contractAddress as Address);
-      if (!target || !isAddress(target)) throw new Error(useSiteCollection ? "Vexora collection address is not configured yet." : "Enter a valid contract address.");
+      if (!target || !isAddress(target)) throw new Error(useSiteCollection ? "The Vexora collection is not ready for public mint yet." : "Enter a valid contract address.");
       const parsed = mintFormSchema.parse({ contractAddress: target, quantity: Number(quantity), tokenId: Number(tokenId) });
       const abi = standard === "ERC1155" ? erc1155Abi : erc721Abi;
       const price = await publicClient.readContract({ address: parsed.contractAddress, abi, functionName: "mintPrice" }).catch(() => BigInt(0));
@@ -462,7 +442,7 @@ export function MintPage() {
 
   return (
     <AppShell>
-      <SectionTitle title="Mint NFT" detail="Mint from the Vexora Early Creator collection or any locally deployed collection contract on Arc Testnet." />
+      <SectionTitle title="Mint NFT" detail="Mint from an available Vexora collection or any collection contract on Arc Testnet." />
       <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
         <Card className="grid gap-4">
           <div className="overflow-hidden rounded-md border border-cyan-200/10 bg-slate-950/60">
@@ -473,7 +453,7 @@ export function MintPage() {
               <Button onClick={() => mintNft(true)} disabled={!siteCollectionAddress || state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"}>
                 Mint Early Creator
               </Button>
-              {!siteCollectionAddress ? <p className="text-xs text-amber-200">Set NEXT_PUBLIC_VEXORA_CREATOR_CONTRACT_ADDRESS on Vercel after deploying the preset.</p> : null}
+              {!siteCollectionAddress ? <p className="text-xs text-amber-200">This collection is being prepared for public mint.</p> : null}
             </div>
           </div>
           <label className="text-sm text-slate-300">
@@ -491,7 +471,7 @@ export function MintPage() {
         </Card>
         <Card className="grid gap-3 text-sm text-slate-300">
           <p>Status: <span className="text-white">{statusText[state]}</span></p>
-          <p>Vexora collection: <span className="text-white">{siteCollectionAddress ? shortAddress(siteCollectionAddress) : "not configured"}</span></p>
+          <p>Vexora collection: <span className="text-white">{siteCollectionAddress ? shortAddress(siteCollectionAddress) : "preparing"}</span></p>
           <p>Selected contract: <span className="text-white">{isAddress(contractAddress) ? shortAddress(contractAddress as Address) : "none"}</span></p>
           <p>Every successful mint records the transaction hash and contract address in the connected wallet profile.</p>
         </Card>

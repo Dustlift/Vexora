@@ -25,15 +25,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <span className="block text-base font-semibold text-white">Vexora</span>
-            <span className="block text-xs text-cyan-100/70">Technical operations on Arc Testnet</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <WalletStatus />
+          <div className="flex items-center gap-3">
             <Link href="/" aria-label="Go to Vexora home" className="grid size-12 place-items-center overflow-hidden rounded-md border border-cyan-200/15 bg-[#02030b] shadow-lg shadow-violet-600/20">
               <Image src="/vexora-logo.png" alt="Vexora logo" width={48} height={48} className="size-12 object-cover" priority />
             </Link>
+            <div>
+              <span className="block text-base font-semibold text-white">Vexora</span>
+              <span className="block text-xs text-cyan-100/70">Technical operations on Arc Testnet</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <WalletStatus />
           </div>
         </div>
         <nav className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3">
