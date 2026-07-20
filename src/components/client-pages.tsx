@@ -85,10 +85,6 @@ function validCollection(item: DeployedNftCollection) {
   return isAddress(item.contractAddress) && item.ownerAddress.toLowerCase() !== ZERO_ADDRESS && item.royaltyReceiver.toLowerCase() !== ZERO_ADDRESS;
 }
 
-function walletProvider() {
-  return (window as unknown as { ethereum?: EIP1193Provider }).ethereum;
-}
-
 function publicClientFromRpc(chain: Parameters<typeof createPublicClient>[0]["chain"]) {
   return createPublicClient({ chain, transport: http() });
 }
@@ -176,6 +172,7 @@ export function FaucetPage() {
 
 export function SwapPage() {
   const { address, refreshLocal } = useWalletScopedData();
+  const { connector } = useAccount();
   const chainId = useChainId();
   const balances = useTokenBalances();
   const [tokenIn, setTokenIn] = useState<SupportedTokenSymbol>("USDC");
@@ -197,12 +194,12 @@ export function SwapPage() {
   }
 
   async function buildSwapAdapter() {
-    const provider = walletProvider();
-    if (!provider) throw new Error("No browser wallet provider found.");
-    const [{ createViemAdapterFromProvider }, { arcTestnet }] = await Promise.all([import("@circle-fin/adapter-viem-v2"), import("@/config/chains")]);
+    if (!connector?.getProvider) throw new Error("Connected wallet provider is not ready.");
+    const provider = (await connector.getProvider({ chainId: ARC_TESTNET_CHAIN_ID })) as EIP1193Provider;
+    const { createViemAdapterFromProvider } = await import("@circle-fin/adapter-viem-v2");
     return createViemAdapterFromProvider({
       provider,
-      getPublicClient: () => publicClientFromRpc(arcTestnet),
+      getPublicClient: ({ chain }) => publicClientFromRpc(chain),
     });
   }
 
