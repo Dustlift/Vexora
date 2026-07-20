@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import { Copy, ExternalLink, RefreshCcw, Repeat2, Send } from "lucide-react";
-import { isAddress, type Address } from "viem";
+import { createPublicClient, http, isAddress, isHex, type Address, type EIP1193Provider } from "viem";
 import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
 import { AppShell } from "@/components/app-shell";
 import { MetricGrid } from "@/components/metric-grid";
@@ -30,6 +30,8 @@ import { makeId, shortAddress } from "@/lib/utils";
 import type { Activity, DeployedNftCollection, NftStandard, OperationState } from "@/types/activity";
 import { erc721DeploySchema, erc1155DeploySchema, mintFormSchema, swapFormSchema } from "@/validators/forms";
 import { toast } from "sonner";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const statusText: Record<OperationState, string> = {
   idle: "Idle",
@@ -81,6 +83,18 @@ function ActivityList({ activities }: { activities: Activity[] }) {
 
 function selectedCollection(collections: DeployedNftCollection[], address: string) {
   return collections.find((item) => item.contractAddress.toLowerCase() === address.toLowerCase());
+}
+
+function validCollection(item: DeployedNftCollection) {
+  return isAddress(item.contractAddress) && item.ownerAddress.toLowerCase() !== ZERO_ADDRESS && item.royaltyReceiver.toLowerCase() !== ZERO_ADDRESS;
+}
+
+function walletProvider() {
+  return (window as unknown as { ethereum?: EIP1193Provider }).ethereum;
+}
+
+function publicClientFromRpc(chain: Parameters<typeof createPublicClient>[0]["chain"]) {
+  return createPublicClient({ chain, transport: http() });
 }
 
 export function DashboardPage() {
@@ -171,10 +185,58 @@ export function SwapPage() {
   const [tokenIn, setTokenIn] = useState<SupportedTokenSymbol>("USDC");
   const [amountIn, setAmountIn] = useState("1.00");
   const [state, setState] = useState<OperationState>("idle");
+  const [estimatedOut, setEstimatedOut] = useState("");
+  const [minimumOut, setMinimumOut] = useState("");
+  const [quoteMessage, setQuoteMessage] = useState("Enter an amount to get a live quote.");
   const tokenOut: SupportedTokenSymbol = tokenIn === "USDC" ? "EURC" : "USDC";
-  const estimated = Number(amountIn || "0") > 0 ? (Number(amountIn) * 0.99).toFixed(6) : "0";
   const slippagePercent = DEFAULT_SLIPPAGE_BPS / 100;
   const balance = tokenIn === "USDC" ? balances.USDC : balances.EURC;
+
+  function setMaxAmount() {
+    const value = tokenIn === "USDC" ? Math.max(Number(balance) - 0.25, 0) : Number(balance);
+    setAmountIn(value > 0 ? value.toFixed(6).replace(/\.?0+$/, "") : "0");
+  }
+
+  async function buildSwapAdapter() {
+    const provider = walletProvider();
+    if (!provider) throw new Error("No browser wallet provider found.");
+    const [{ createViemAdapterFromProvider }, { arcTestnet }] = await Promise.all([import("@circle-fin/adapter-viem-v2"), import("@/config/chains")]);
+    return createViemAdapterFromProvider({
+      provider,
+      getPublicClient: () => publicClientFromRpc(arcTestnet),
+    });
+  }
+
+  async function requestQuote() {
+    try {
+      setState("loading");
+      swapFormSchema.parse({ tokenIn, tokenOut, amountIn, slippageBps: DEFAULT_SLIPPAGE_BPS });
+      if (!address) throw new Error("Connect a wallet first.");
+      if (chainId !== ARC_TESTNET_CHAIN_ID) throw new Error("Switch to Arc Testnet before getting a quote.");
+      if (Number(amountIn) > Number(balance)) throw new Error("Insufficient token balance.");
+      if (tokenIn === "USDC" && Number(balance) - Number(amountIn) < 0.25) throw new Error("Keep a USDC reserve for gas.");
+      const [{ AppKit }] = await Promise.all([import("@circle-fin/app-kit")]);
+      const adapter = await buildSwapAdapter();
+      const kit = new AppKit();
+      const estimate = await kit.estimateSwap({
+        from: { adapter, chain: ARC_CIRCLE_CHAIN_IDENTIFIER },
+        tokenIn,
+        tokenOut,
+        amountIn,
+        config: { slippageBps: DEFAULT_SLIPPAGE_BPS },
+      });
+      setEstimatedOut(estimate.estimatedOutput.amount);
+      setMinimumOut(estimate.stopLimit.amount);
+      setQuoteMessage("Live quote ready.");
+      setState("success");
+    } catch (error) {
+      setEstimatedOut("");
+      setMinimumOut("");
+      setQuoteMessage(toUserFacingError(error));
+      setState("error");
+      toast.error(toUserFacingError(error));
+    }
+  }
 
   async function submitSwap() {
     try {
@@ -183,70 +245,90 @@ export function SwapPage() {
       if (!address) throw new Error("Connect a wallet first.");
       if (chainId !== ARC_TESTNET_CHAIN_ID) throw new Error("Switch to Arc Testnet before swapping.");
       if (Number(amountIn) > Number(balance)) throw new Error("Insufficient token balance.");
-      if (tokenIn === "USDC" && Number(balance) - Number(amountIn) < 0.25) throw new Error("Keep a USDC reserve for gas.");
-      const res = await fetch("/api/circle/swap/estimate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tokenIn, tokenOut, amountIn, slippageBps: DEFAULT_SLIPPAGE_BPS, chain: ARC_CIRCLE_CHAIN_IDENTIFIER }),
+      const [{ AppKit }] = await Promise.all([import("@circle-fin/app-kit")]);
+      const adapter = await buildSwapAdapter();
+      const kit = new AppKit();
+      setState("wallet_confirmation");
+      const result = await kit.swap({
+        from: { adapter, chain: ARC_CIRCLE_CHAIN_IDENTIFIER },
+        tokenIn,
+        tokenOut,
+        amountIn,
+        config: { slippageBps: DEFAULT_SLIPPAGE_BPS },
       });
-      if (!res.ok) throw new Error((await res.json()).error || "Circle quote unavailable.");
+      const txHash = result.txHash && isHex(result.txHash) ? result.txHash : undefined;
       addActivity(address, {
         id: makeId("swap"),
         walletAddress: address,
         type: "swap",
-        status: "pending",
+        status: "success",
+        txHash,
         tokenIn,
         tokenOut,
         amountIn,
-        amountOut: estimated,
+        amountOut: result.amountOut || estimatedOut,
         createdAt: new Date().toISOString(),
       });
       refreshLocal();
       setState("success");
-      toast.success("Swap quote check completed. Circle signing is ready once the production adapter is enabled.");
+      balances.refresh();
+      toast.success("Swap submitted on Arc Testnet.");
     } catch (error) {
       setState("error");
+      setQuoteMessage(toUserFacingError(error));
       toast.error(toUserFacingError(error));
     }
   }
 
   return (
     <AppShell>
-      <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-        <Card className="grid gap-5">
+      <div className="mx-auto grid max-w-xl gap-5">
+        <Card className="grid gap-4 border-cyan-200/15 bg-slate-950/70">
           <div className="flex items-center justify-between gap-3">
             <SectionTitle title="Swap" />
             <span className="rounded-md border border-cyan-200/15 bg-white/10 px-3 py-1 text-sm font-semibold text-cyan-100">%{slippagePercent}</span>
           </div>
-          <label className="text-sm text-slate-300">
-            From
-            <Select value={tokenIn} onChange={(event) => setTokenIn(event.target.value as SupportedTokenSymbol)}>
-              <option>USDC</option>
-              <option>EURC</option>
-            </Select>
-          </label>
-          <label className="text-sm text-slate-300">
-            Amount
-            <Input value={amountIn} onChange={(event) => setAmountIn(event.target.value)} />
-          </label>
-          <div className="flex items-center justify-between rounded-md border border-white/10 bg-slate-950/50 p-3 text-sm text-slate-300">
-            <span>{tokenOut}</span>
-            <span className="text-white">{estimated}</span>
+          <div className="rounded-md border border-white/10 bg-[#070b18] p-4">
+            <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
+              <span>Pay</span>
+              <button type="button" onClick={setMaxAmount} className="rounded-md bg-cyan-300/10 px-2 py-1 font-semibold text-cyan-100 hover:bg-cyan-300/20">
+                MAX
+              </button>
+            </div>
+            <div className="grid grid-cols-[1fr_120px] gap-3">
+              <Input value={amountIn} onChange={(event) => setAmountIn(event.target.value)} className="h-14 border-0 bg-transparent px-0 text-3xl" />
+              <Select value={tokenIn} onChange={(event) => setTokenIn(event.target.value as SupportedTokenSymbol)} className="h-12">
+                <option>USDC</option>
+                <option>EURC</option>
+              </Select>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">Balance {Number(balance).toFixed(6)} {tokenIn}</p>
           </div>
-          <button type="button" className="inline-flex items-center gap-2 text-sm text-cyan-200" onClick={() => setTokenIn(tokenOut)}>
-            <Repeat2 size={16} /> Switch pair
+          <button type="button" aria-label="Switch swap direction" className="mx-auto grid size-10 place-items-center rounded-md border border-cyan-200/15 bg-white/10 text-cyan-100 hover:bg-white/15" onClick={() => setTokenIn(tokenOut)}>
+            <Repeat2 size={18} />
           </button>
-          <Button onClick={submitSwap} disabled={state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"} className="bg-gradient-to-r from-violet-400 via-indigo-500 to-cyan-300">
+          <div className="rounded-md border border-white/10 bg-[#070b18] p-4">
+            <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
+              <span>Receive</span>
+              <span>{tokenOut}</span>
+            </div>
+            <p className="min-h-10 text-3xl font-semibold text-white">{estimatedOut || "-"}</p>
+            <p className="mt-2 text-xs text-slate-400">Minimum {minimumOut || "-"} {tokenOut}</p>
+          </div>
+          <p className="text-sm text-slate-300">{quoteMessage}</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button onClick={requestQuote} disabled={state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"} className="border-white/15 bg-white/10 text-white hover:bg-white/15">
+              Get quote
+            </Button>
+            <Button onClick={submitSwap} disabled={!estimatedOut || state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"} className="bg-gradient-to-r from-violet-400 via-indigo-500 to-cyan-300">
             Swap
-          </Button>
-        </Card>
-        <Card className="grid gap-3 text-sm text-slate-300">
-          <p>Status: <span className="text-white">{statusText[state]}</span></p>
-          <p>Pair: <span className="text-white">{tokenIn} to {tokenOut}</span></p>
-          <p>Balance: <span className="text-white">{balance} {tokenIn}</span></p>
-          <p>Auto slippage: <span className="text-white">%{slippagePercent}</span></p>
-          <p>Token in: <span className="text-white">{shortAddress(ARC_TOKENS[tokenIn].address)}</span></p>
-          <p>Token out: <span className="text-white">{shortAddress(ARC_TOKENS[tokenOut].address)}</span></p>
+            </Button>
+          </div>
+          <div className="grid gap-2 border-t border-white/10 pt-3 text-xs text-slate-400">
+            <p>Status: <span className="text-white">{statusText[state]}</span></p>
+            <p>Route: <span className="text-white">{tokenIn} to {tokenOut}</span></p>
+            <p>Contracts: <span className="text-white">{shortAddress(ARC_TOKENS[tokenIn].address)} to {shortAddress(ARC_TOKENS[tokenOut].address)}</span></p>
+          </div>
         </Card>
       </div>
     </AppShell>
@@ -484,44 +566,35 @@ export function MintPage() {
 }
 
 export function MyNftsPage() {
-  const { address, collections, activities } = useWalletScopedData();
-  const minted = activities.filter((item) => item.type === "nft_mint");
+  const { collections, activities } = useWalletScopedData();
+  const minted = activities.filter((item) => item.type === "nft_mint" && item.status === "success" && item.txHash && item.contractAddress);
+  const visibleCollections = collections.filter(validCollection);
+  const items = [
+    ...minted.map((item) => ({
+      id: item.id,
+      image: item.metadataUri || VEXORA_CREATOR_COLLECTION.image,
+      alt: "Minted NFT",
+      href: explorer.tx(item.txHash!),
+    })),
+    ...visibleCollections.map((item) => ({
+      id: item.id,
+      image: item.imageUri || VEXORA_CREATOR_COLLECTION.image,
+      alt: item.name,
+      href: explorer.address(item.contractAddress),
+    })),
+  ];
 
   return (
     <AppShell>
-      <SectionTitle title="My NFTs" detail="Wallet-scoped NFT records saved after successful mints and collection deployments." />
-      <div className="grid gap-4 md:grid-cols-2">
-        {minted.map((item) => (
-          <Card key={item.id} className="grid gap-2 text-sm text-slate-300">
-            {item.metadataUri ? <Image src={item.metadataUri} alt="Minted NFT" width={640} height={360} className="h-48 w-full rounded-md object-cover" unoptimized /> : null}
-            <h2 className="text-lg font-semibold text-white">Minted NFT</h2>
-            <p>Contract: {item.contractAddress ? shortAddress(item.contractAddress) : "-"}</p>
-            <p>Token ID: {item.tokenId || "see transaction logs"}</p>
-            <p>Date: {new Date(item.createdAt).toLocaleString()}</p>
-            {item.txHash ? <a href={explorer.tx(item.txHash)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-cyan-200">Transaction <ExternalLink size={14} /></a> : null}
-          </Card>
-        ))}
-        {collections.map((item: DeployedNftCollection) => (
-          <Card key={item.id} className="grid gap-2 text-sm text-slate-300">
-            {item.imageUri ? <Image src={item.imageUri} alt={item.name} width={640} height={360} className="h-48 w-full rounded-md object-cover" unoptimized /> : null}
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-white">{item.name}</h2>
-                <p>{item.standard} {item.symbol ? `- ${item.symbol}` : ""}</p>
-              </div>
-              <a href={explorer.address(item.contractAddress)} target="_blank" rel="noreferrer" className="text-cyan-200"><ExternalLink size={18} /></a>
-            </div>
-            <p>Contract: {shortAddress(item.contractAddress)}</p>
-            <p>Owner: {shortAddress(item.ownerAddress)}</p>
-            <p>Maximum supply: {item.maxSupply}</p>
-            {item.imageUri ? <p>Image: {item.imageUri}</p> : null}
-            <p>Public mint: {item.publicMint ? "open" : "closed"}</p>
-            <p>Royalty: {item.royaltyBps / 100}% to {shortAddress(item.royaltyReceiver)}</p>
-            {address?.toLowerCase() === item.ownerAddress.toLowerCase() ? <p className="text-cyan-100">Owner controls are available through the deployed contract wallet interface.</p> : null}
-          </Card>
+      <SectionTitle title="My NFTs" detail="Minted NFTs and deployed collections from this wallet." />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((item) => (
+          <a key={item.id} href={item.href} target="_blank" rel="noreferrer" aria-label={`Open ${item.alt} on ArcScan`} className="group block overflow-hidden rounded-lg border border-cyan-200/10 bg-slate-950/60 transition hover:-translate-y-1 hover:border-cyan-200/35">
+            <Image src={item.image} alt={item.alt} width={640} height={640} className="aspect-square w-full object-cover" unoptimized />
+          </a>
         ))}
       </div>
-      {!collections.length && !minted.length ? <Card><p className="text-sm text-slate-400">No NFT records for this wallet yet.</p></Card> : null}
+      {!items.length ? <Card><p className="text-sm text-slate-400">No minted NFTs or deployed collections for this wallet yet.</p></Card> : null}
     </AppShell>
   );
 }
@@ -531,10 +604,11 @@ export function ProfilePage() {
   const chainId = useChainId();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
-  const minted = activities.filter((item) => item.type === "nft_mint");
+  const minted = activities.filter((item) => item.type === "nft_mint" && item.status === "success" && item.contractAddress);
+  const visibleCollections = collections.filter(validCollection);
   const [transfer, setTransfer] = useState({
     standard: "ERC721" as NftStandard,
-    contractAddress: minted[0]?.contractAddress || collections[0]?.contractAddress || "",
+    contractAddress: minted[0]?.contractAddress || visibleCollections[0]?.contractAddress || "",
     tokenId: minted[0]?.tokenId || "1",
     quantity: "1",
     recipient: "",
@@ -599,7 +673,7 @@ export function ProfilePage() {
         <Card className="grid gap-3 text-sm text-slate-300">
           <p>Wallet: <span className="text-white">{shortAddress(address)}</span></p>
           <p>NFT mints: <span className="text-white">{minted.length}</span></p>
-          <p>Collections deployed: <span className="text-white">{collections.length}</span></p>
+          <p>Collections deployed: <span className="text-white">{visibleCollections.length}</span></p>
           <p>Last swap input: <span className="text-white">{nativeGas || "-"}</span></p>
         </Card>
         <Card className="grid gap-4">
