@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run build:contracts && next build",
+    "build:contracts": "node scripts/compile-contracts.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -48,6 +49,7 @@
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^29.1.1",
     "prettier": "^3.9.5",
+    "solc": "^0.8.36",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"

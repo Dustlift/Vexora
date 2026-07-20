@@ -34,7 +34,8 @@ export function getCollections(wallet?: Address) {
 }
 
 export function saveCollection(wallet: Address, collection: DeployedNftCollection) {
-  const next = [collection, ...getCollections(wallet)];
+  const existing = getCollections(wallet).filter((item) => item.contractAddress.toLowerCase() !== collection.contractAddress.toLowerCase());
+  const next = [collection, ...existing];
   writeJson(collectionKey(wallet), next);
   return next;
 }

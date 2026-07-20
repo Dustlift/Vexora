@@ -1,40 +1,42 @@
 import Link from "next/link";
-import Image from "next/image";
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { Activity, Droplets, GalleryHorizontalEnd, LayoutDashboard, Repeat2, Rocket, UserRound, Wand2, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Card } from "@/components/ui/card";
+
+const links: Array<{ href: string; title: string; icon: LucideIcon }> = [
+  { href: "/dashboard", title: "Dashboard", icon: LayoutDashboard },
+  { href: "/faucet", title: "Faucet", icon: Droplets },
+  { href: "/swap", title: "Swap", icon: Repeat2 },
+  { href: "/deploy", title: "NFT Deploy", icon: Rocket },
+  { href: "/mint", title: "Mint NFT", icon: Wand2 },
+  { href: "/my-nfts", title: "My NFTs", icon: GalleryHorizontalEnd },
+  { href: "/profile", title: "Profile", icon: UserRound },
+  { href: "/transactions", title: "Transactions", icon: Activity },
+];
 
 export default function Home() {
   return (
     <AppShell>
-      <section className="grid gap-8 py-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-        <div>
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Vexora Arc Testnet toolkit</p>
-          <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-white md:text-6xl">Vexora brings Arc Testnet operations into one precise workspace.</h1>
-          <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-            Arc Testnet uzerinde test token bakiyelerinizi goruntuleyin, USDC ve EURC arasinda swap yapin, NFT koleksiyonlari deploy edin ve NFT mint islemlerini yonetin.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/dashboard" className="inline-flex min-h-11 items-center gap-2 rounded-md bg-cyan-300 px-5 py-2 font-semibold text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-violet-300">
-              Open dashboard <ArrowRight size={18} />
+      <section className="py-4">
+        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-200">Vexora Arc Testnet toolkit</p>
+        <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-white md:text-6xl">Choose an Arc Testnet operation.</h1>
+        <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">
+          Arc Testnet uzerinde test token bakiyelerinizi goruntuleyin, USDC ve EURC arasinda swap yapin, NFT koleksiyonlari deploy edin ve NFT mint islemlerini yonetin.
+        </p>
+      </section>
+      <section className="grid gap-4 pb-10 pt-6 sm:grid-cols-2 lg:grid-cols-4">
+        {links.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link key={item.href} href={item.href} className="group aspect-square rounded-lg border border-cyan-200/10 bg-white/[0.045] p-5 shadow-2xl shadow-black/20 ring-1 ring-violet-300/5 transition hover:-translate-y-1 hover:border-cyan-200/25 hover:bg-white/[0.07]">
+              <div className="flex h-full flex-col justify-between">
+                <span className="grid size-14 place-items-center rounded-md bg-gradient-to-br from-violet-400 via-indigo-500 to-cyan-300 text-white shadow-lg shadow-cyan-500/20">
+                  <Icon size={28} />
+                </span>
+                <span className="text-2xl font-semibold text-white">{item.title}</span>
+              </div>
             </Link>
-            <Link href="/deploy" className="inline-flex min-h-11 items-center gap-2 rounded-md border border-white/15 px-5 py-2 font-semibold text-white hover:bg-white/10">
-              Deploy NFT collection
-            </Link>
-          </div>
-        </div>
-        <Card className="grid gap-4">
-          <div className="mx-auto w-full max-w-sm overflow-hidden rounded-lg border border-cyan-200/10 bg-[#02030b] shadow-2xl shadow-violet-700/20">
-            <Image src="/vexora-logo.png" alt="Vexora logo" width={1024} height={1024} className="h-auto w-full object-cover" priority />
-          </div>
-          {["Arc Testnet chain verification before every transaction", "USDC gas token display with no ETH labels", "Local wallet-scoped activity and NFT collection history", "OpenZeppelin-based ERC-721 and ERC-1155 templates"].map((item) => (
-            <div key={item} className="flex gap-3 rounded-md border border-white/10 bg-slate-950/50 p-4">
-              <ShieldCheck className="mt-0.5 text-cyan-200" size={20} />
-              <span className="text-sm leading-6 text-slate-200">{item}</span>
-            </div>
-          ))}
-          <p className="text-sm leading-6 text-slate-400">Testnet assets are for technical testing only and have no real-world monetary value.</p>
-        </Card>
+          );
+        })}
       </section>
     </AppShell>
   );

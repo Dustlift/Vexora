@@ -23,6 +23,8 @@ export type Activity = {
   amountIn?: string;
   amountOut?: string;
   errorMessage?: string;
+  metadataUri?: string;
+  recipientAddress?: Address;
   createdAt: string;
 };
 

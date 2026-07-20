@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {ERC2981} from "@openzeppelin/contracts/token/common/ERC2981.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -24,7 +25,7 @@ contract ArcErc721Collection is ERC721, ERC2981, Ownable2Step, ReentrancyGuard {
     mapping(address wallet => uint256 count) public mintedByWallet;
 
     event BaseURIUpdated(string baseUri);
-    event MetadataFrozen();
+    event MetadataLocked();
     event PublicMintSet(bool enabled);
 
     constructor(
@@ -74,7 +75,7 @@ contract ArcErc721Collection is ERC721, ERC2981, Ownable2Step, ReentrancyGuard {
 
     function freezeMetadata() external onlyOwner {
         metadataFrozen = true;
-        emit MetadataFrozen();
+        emit MetadataLocked();
     }
 
     function setDefaultRoyalty(address receiver, uint96 feeNumerator) external onlyOwner {
