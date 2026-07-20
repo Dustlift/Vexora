@@ -30,7 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
             <div>
               <span className="block text-base font-semibold text-white">Vexora</span>
-              <span className="block text-xs text-cyan-100/70">Technical operations on Arc Testnet</span>
+              <span className="block text-xs text-cyan-100/70">Vexora Arc Testnet toolkit</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
