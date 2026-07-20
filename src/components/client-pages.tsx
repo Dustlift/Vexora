@@ -259,7 +259,7 @@ export function SwapPage() {
         tokenIn,
         tokenOut,
         amountIn,
-        config: { slippageBps: DEFAULT_SLIPPAGE_BPS },
+        config: { allowanceStrategy: "approve", slippageBps: DEFAULT_SLIPPAGE_BPS },
       });
       const txHash = result.txHash && isHex(result.txHash) ? result.txHash : undefined;
       addActivity(address, {
