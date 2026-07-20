@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, RefreshCcw, Repeat2, Send } from "lucide-react";
-import { createPublicClient, http, isAddress, isHex, type Address, type EIP1193Provider } from "viem";
+import { isAddress, type Address } from "viem";
 import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
 import { AppShell } from "@/components/app-shell";
 import { MetricGrid } from "@/components/metric-grid";
@@ -83,10 +83,6 @@ function ActivityList({ activities }: { activities: Activity[] }) {
 
 function validCollection(item: DeployedNftCollection) {
   return isAddress(item.contractAddress) && item.ownerAddress.toLowerCase() !== ZERO_ADDRESS && item.royaltyReceiver.toLowerCase() !== ZERO_ADDRESS;
-}
-
-function publicClientFromRpc(chain: Parameters<typeof createPublicClient>[0]["chain"]) {
-  return createPublicClient({ chain, transport: http() });
 }
 
 export function DashboardPage() {
@@ -171,8 +167,7 @@ export function FaucetPage() {
 }
 
 export function SwapPage() {
-  const { address, refreshLocal } = useWalletScopedData();
-  const { connector } = useAccount();
+  const { address } = useWalletScopedData();
   const chainId = useChainId();
   const balances = useTokenBalances();
   const [tokenIn, setTokenIn] = useState<SupportedTokenSymbol>("USDC");
@@ -191,16 +186,6 @@ export function SwapPage() {
   function setMaxAmount() {
     const value = tokenIn === "USDC" ? Math.max(Number(balance) - 0.25, 0) : Number(balance);
     setAmountIn(value > 0 ? value.toFixed(6).replace(/\.?0+$/, "") : "0");
-  }
-
-  async function buildSwapAdapter() {
-    if (!connector?.getProvider) throw new Error("Connected wallet provider is not ready.");
-    const provider = (await connector.getProvider({ chainId: ARC_TESTNET_CHAIN_ID })) as EIP1193Provider;
-    const { createViemAdapterFromProvider } = await import("@circle-fin/adapter-viem-v2");
-    return createViemAdapterFromProvider({
-      provider,
-      getPublicClient: ({ chain }) => publicClientFromRpc(chain),
-    });
   }
 
   const quoteKey = `${tokenIn}:${tokenOut}:${amountIn}:${balance}:${address || ""}:${chainId}`;
@@ -244,45 +229,10 @@ export function SwapPage() {
   }, [address, amountIn, balance, chainId, requestQuote, tokenIn, tokenOut]);
 
   async function submitSwap() {
-    try {
-      setState("loading");
-      swapFormSchema.parse({ tokenIn, tokenOut, amountIn, slippageBps: DEFAULT_SLIPPAGE_BPS });
-      if (!address) throw new Error("Connect a wallet first.");
-      if (chainId !== ARC_TESTNET_CHAIN_ID) throw new Error("Switch to Arc Testnet before swapping.");
-      if (Number(amountIn) > Number(balance)) throw new Error("Insufficient token balance.");
-      const [{ AppKit }] = await Promise.all([import("@circle-fin/app-kit")]);
-      const adapter = await buildSwapAdapter();
-      const kit = new AppKit();
-      setState("wallet_confirmation");
-      const result = await kit.swap({
-        from: { adapter, chain: ARC_CIRCLE_CHAIN_IDENTIFIER },
-        tokenIn,
-        tokenOut,
-        amountIn,
-        config: { allowanceStrategy: "approve", slippageBps: DEFAULT_SLIPPAGE_BPS },
-      });
-      const txHash = result.txHash && isHex(result.txHash) ? result.txHash : undefined;
-      addActivity(address, {
-        id: makeId("swap"),
-        walletAddress: address,
-        type: "swap",
-        status: "success",
-        txHash,
-        tokenIn,
-        tokenOut,
-        amountIn,
-        amountOut: result.amountOut || estimatedOut,
-        createdAt: new Date().toISOString(),
-      });
-      refreshLocal();
-      setState("success");
-      balances.refresh();
-      toast.success("Swap submitted on Arc Testnet.");
-    } catch (error) {
-      setState("error");
-      setQuote((current) => ({ ...current, message: toUserFacingError(error) }));
-      toast.error(toUserFacingError(error));
-    }
+    const message = "Swap execution is quote-only until a secure server-side signing flow is connected.";
+    setState("error");
+    setQuote((current) => ({ ...current, message }));
+    toast.error(message);
   }
 
   return (
