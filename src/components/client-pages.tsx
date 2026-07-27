@@ -2,15 +2,15 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Copy, ExternalLink, RefreshCcw, Send } from "lucide-react";
-import { isAddress, type Address } from "viem";
+import { Copy, ExternalLink, RefreshCcw, Send, Upload } from "lucide-react";
+import { formatUnits, isAddress, type Address } from "viem";
 import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
 import { AppShell } from "@/components/app-shell";
 import { MetricGrid } from "@/components/metric-grid";
 import { Button } from "@/components/ui/button";
 import { Card, SectionTitle } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/input";
-import { ARC_TESTNET_CHAIN_ID, ARC_TESTNET_FAUCET_URL } from "@/config/chains";
+import { ARC_TESTNET_CHAIN_ID, ARC_TESTNET_EXPLORER_URL, ARC_TESTNET_FAUCET_URL } from "@/config/chains";
 import { explorer } from "@/config/explorer";
 import { VEXORA_CREATOR_COLLECTION } from "@/config/nft";
 import type { SupportedTokenSymbol } from "@/config/tokens";
@@ -33,6 +33,26 @@ import { toast } from "sonner";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const REQUIRED_COLLECTION_IMAGE_SIZE = 800;
+const TRANSACTION_TABLE_LIMIT = 50;
+
+type ArcScanTransaction = {
+  hash: string;
+  from: string;
+  to: string;
+  contractAddress?: string;
+  timeStamp: string;
+  functionName?: string;
+  input?: string;
+  isError?: string;
+  value?: string;
+};
+
+type ArcNftItem = {
+  id?: string;
+  token?: {
+    address_hash?: string;
+  };
+};
 
 const statusText: Record<OperationState, string> = {
   idle: "Idle",
@@ -296,7 +316,10 @@ export function DeployPage() {
           <label className="text-sm text-slate-300">Base URI<Input value={form.baseUri} placeholder="ipfs://metadata/" onChange={(event) => update("baseUri", event.target.value)} /></label>
           <label className="grid gap-2 text-sm text-slate-300">
             Collection image
-            <Input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void updateCollectionImage(event.target.files?.[0])} />
+            <input id="collection-image-upload" type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => void updateCollectionImage(event.target.files?.[0])} />
+            <span className="inline-flex h-10 w-fit cursor-pointer items-center gap-2 rounded-md bg-cyan-200 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-100" role="button" tabIndex={0}>
+              <Upload size={16} /> Choose file
+            </span>
             <span className="text-xs text-slate-400">PNG, JPG, or WebP. Required size: {REQUIRED_COLLECTION_IMAGE_SIZE}x{REQUIRED_COLLECTION_IMAGE_SIZE}px.</span>
           </label>
           {form.imageUri ? (
@@ -567,13 +590,130 @@ export function ProfilePage() {
 }
 
 export function TransactionsPage() {
-  const { activities } = useWalletScopedData();
+  const { address } = useWalletScopedData();
+  const balances = useTokenBalances();
+  const [transactions, setTransactions] = useState<ArcScanTransaction[]>([]);
+  const [nftCount, setNftCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    if (!address) {
+      void Promise.resolve().then(() => {
+        if (!active) return;
+        setTransactions([]);
+        setNftCount(0);
+      });
+      return;
+    }
+
+    async function loadArcActivity() {
+      setIsLoading(true);
+      setErrorMessage("");
+      try {
+        const txUrl = `${ARC_TESTNET_EXPLORER_URL}/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=10000&sort=desc`;
+        const nftUrl = `${ARC_TESTNET_EXPLORER_URL}/api/v2/addresses/${address}/nft`;
+        const [txResponse, nftResponse] = await Promise.all([fetch(txUrl), fetch(nftUrl)]);
+        const txPayload = await txResponse.json();
+        const nftPayload = await nftResponse.json().catch(() => ({ items: [] }));
+        const nextTransactions = Array.isArray(txPayload.result) ? (txPayload.result as ArcScanTransaction[]) : [];
+        const nextNfts = Array.isArray(nftPayload.items) ? (nftPayload.items as ArcNftItem[]) : [];
+
+        if (active) {
+          setTransactions(nextTransactions);
+          setNftCount(nextNfts.length);
+        }
+      } catch {
+        if (active) setErrorMessage("ArcScan activity could not be loaded.");
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
+
+    void loadArcActivity();
+    return () => {
+      active = false;
+    };
+  }, [address]);
+
+  const normalizedAddress = address?.toLowerCase();
+  const activeDays = new Set(transactions.map((tx) => new Date(Number(tx.timeStamp) * 1000).toISOString().slice(0, 10))).size;
+  const deployedContracts = transactions.filter((tx) => !tx.to || Boolean(tx.contractAddress)).length;
+  const interactedContracts = new Set(
+    transactions
+      .map((tx) => tx.contractAddress || tx.to)
+      .filter((value) => value && value.toLowerCase() !== normalizedAddress),
+  ).size;
+
+  function formatTxDate(timestamp: string) {
+    return new Date(Number(timestamp) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function formatNativeValue(value?: string) {
+    if (!value || value === "0") return "0";
+    return Number(formatUnits(BigInt(value), 18)).toFixed(4);
+  }
 
   return (
     <AppShell>
-      <SectionTitle title="Transactions" detail="First-version transaction history is stored locally per wallet address." />
-      <Card>
-        <ActivityList activities={activities} />
+      <SectionTitle title="Transactions" detail="Arc Testnet activity summary for the connected wallet." />
+      <MetricGrid
+        items={[
+          { label: "Total transactions", value: String(transactions.length), detail: isLoading ? "Loading from ArcScan" : "Confirmed wallet activity" },
+          { label: "NFTs held", value: String(nftCount), detail: "Owned NFTs reported by ArcScan" },
+          { label: "Contracts interacted", value: String(interactedContracts), detail: "Unique contract addresses" },
+          { label: "Deployments", value: String(deployedContracts), detail: "Contract creation transactions" },
+          { label: "Active days", value: String(activeDays), detail: "Unique transaction dates" },
+          { label: "USDC balance", value: balances.USDC, detail: `Native gas: ${balances.nativeGas}` },
+          { label: "EURC balance", value: balances.EURC },
+        ]}
+      />
+      <Card className="mt-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <SectionTitle title="Arc Transactions" />
+          <Button onClick={balances.refresh} className="w-fit border-white/15 bg-white/10 text-white hover:bg-white/15">
+            <RefreshCcw size={16} /> Refresh balances
+          </Button>
+        </div>
+        {errorMessage ? <p className="mb-4 text-sm text-red-200">{errorMessage}</p> : null}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="border-b border-white/10 text-xs uppercase text-slate-400">
+              <tr>
+                <th className="py-3 pr-4 font-medium">Date</th>
+                <th className="py-3 pr-4 font-medium">Type</th>
+                <th className="py-3 pr-4 font-medium">Counterparty</th>
+                <th className="py-3 pr-4 font-medium">Value</th>
+                <th className="py-3 pr-4 font-medium">Status</th>
+                <th className="py-3 font-medium">Tx</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/10 text-slate-300">
+              {transactions.slice(0, TRANSACTION_TABLE_LIMIT).map((tx) => {
+                const isDeploy = !tx.to || Boolean(tx.contractAddress);
+                const isOutgoing = tx.from.toLowerCase() === normalizedAddress;
+                const counterparty = tx.contractAddress || tx.to || "Contract deploy";
+                return (
+                  <tr key={tx.hash}>
+                    <td className="py-3 pr-4">{formatTxDate(tx.timeStamp)}</td>
+                    <td className="py-3 pr-4 text-white">{isDeploy ? "Deploy" : isOutgoing ? "Sent" : "Received"}</td>
+                    <td className="py-3 pr-4">{counterparty === "Contract deploy" ? counterparty : shortAddress(counterparty)}</td>
+                    <td className="py-3 pr-4">{formatNativeValue(tx.value)} USDC</td>
+                    <td className="py-3 pr-4">{tx.isError === "1" ? "Failed" : "Success"}</td>
+                    <td className="py-3">
+                      <a className="inline-flex items-center gap-1 text-cyan-200 hover:text-cyan-100" href={explorer.tx(tx.hash)} target="_blank" rel="noreferrer">
+                        {shortAddress(tx.hash, 8)} <ExternalLink size={13} />
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {!transactions.length && !isLoading ? <p className="mt-4 text-sm text-slate-400">No Arc transactions found for this wallet.</p> : null}
+        {transactions.length > TRANSACTION_TABLE_LIMIT ? <p className="mt-4 text-xs text-slate-400">Showing the latest {TRANSACTION_TABLE_LIMIT} of {transactions.length} transactions.</p> : null}
       </Card>
     </AppShell>
   );
