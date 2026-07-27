@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Copy, ExternalLink, RefreshCcw, Send } from "lucide-react";
 import { isAddress, type Address } from "viem";
 import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
@@ -32,6 +32,7 @@ import { erc721DeploySchema, erc1155DeploySchema, mintFormSchema } from "@/valid
 import { toast } from "sonner";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const REQUIRED_COLLECTION_IMAGE_SIZE = 800;
 
 const statusText: Record<OperationState, string> = {
   idle: "Idle",
@@ -179,7 +180,7 @@ export function DeployPage() {
     imageUri: "",
     maxSupply: "",
     mintPrice: "0",
-    maxPerWallet: "",
+    maxPerWallet: "5",
     royaltyBps: "0",
     royaltyReceiver: "",
     owner: "",
@@ -191,6 +192,25 @@ export function DeployPage() {
 
   function update(key: string, value: string | boolean) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function updateCollectionImage(file?: File) {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("Upload a PNG, JPG, or WebP image.");
+      return;
+    }
+    const bitmap = await createImageBitmap(file);
+    const isRequiredSize = bitmap.width === REQUIRED_COLLECTION_IMAGE_SIZE && bitmap.height === REQUIRED_COLLECTION_IMAGE_SIZE;
+    bitmap.close();
+    if (!isRequiredSize) {
+      toast.error(`Image must be ${REQUIRED_COLLECTION_IMAGE_SIZE}x${REQUIRED_COLLECTION_IMAGE_SIZE}px.`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => update("imageUri", String(reader.result));
+    reader.onerror = () => toast.error("Image could not be read from this device.");
+    reader.readAsDataURL(file);
   }
 
   async function deployCollection() {
@@ -274,16 +294,18 @@ export function DeployPage() {
           <label className="text-sm text-slate-300">Collection name<Input value={form.name} placeholder="Collection name" onChange={(event) => update("name", event.target.value)} /></label>
           {standard === "ERC721" ? <label className="text-sm text-slate-300">Symbol<Input value={form.symbol} placeholder="SYMBOL" onChange={(event) => update("symbol", event.target.value)} /></label> : null}
           <label className="text-sm text-slate-300">Base URI<Input value={form.baseUri} placeholder="ipfs://metadata/" onChange={(event) => update("baseUri", event.target.value)} /></label>
-          <label className="text-sm text-slate-300">Collection image<Input value={form.imageUri} placeholder="ipfs://image.png or https://..." onChange={(event) => update("imageUri", event.target.value)} /></label>
+          <label className="grid gap-2 text-sm text-slate-300">
+            Collection image
+            <Input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void updateCollectionImage(event.target.files?.[0])} />
+            <span className="text-xs text-slate-400">PNG, JPG, or WebP. Required size: {REQUIRED_COLLECTION_IMAGE_SIZE}x{REQUIRED_COLLECTION_IMAGE_SIZE}px.</span>
+          </label>
+          {form.imageUri ? (
+            <div className="overflow-hidden rounded-md border border-cyan-200/10 bg-slate-950/60">
+              <Image src={form.imageUri} alt="Collection preview" width={800} height={800} className="aspect-square w-full object-cover" unoptimized />
+            </div>
+          ) : null}
           {standard === "ERC1155" ? <label className="text-sm text-slate-300">Token ID<Input value={form.tokenId} onChange={(event) => update("tokenId", event.target.value)} /></label> : null}
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="text-sm text-slate-300">Maximum supply<Input value={form.maxSupply} placeholder="10000" onChange={(event) => update("maxSupply", event.target.value)} /></label>
-            <label className="text-sm text-slate-300">Max per wallet<Input value={form.maxPerWallet} placeholder="5" onChange={(event) => update("maxPerWallet", event.target.value)} /></label>
-            <label className="text-sm text-slate-300">Mint price<Input value={form.mintPrice} onChange={(event) => update("mintPrice", event.target.value)} /></label>
-            <label className="text-sm text-slate-300">Royalty bps<Input value={form.royaltyBps} onChange={(event) => update("royaltyBps", event.target.value)} /></label>
-          </div>
-          <label className="text-sm text-slate-300">Royalty receiver<Input value={form.royaltyReceiver} placeholder="Connected wallet by default" onChange={(event) => update("royaltyReceiver", event.target.value)} /></label>
-          <label className="text-sm text-slate-300">Contract owner<Input value={form.owner} placeholder="Connected wallet by default" onChange={(event) => update("owner", event.target.value)} /></label>
+          <label className="text-sm text-slate-300">Maximum supply<Input value={form.maxSupply} placeholder="10000" onChange={(event) => update("maxSupply", event.target.value)} /></label>
           <Button onClick={deployCollection} disabled={state === "wallet_confirmation" || state === "transaction_pending" || state === "loading"}>
             Deploy collection
           </Button>
@@ -291,8 +313,8 @@ export function DeployPage() {
         <Card className="grid gap-3 text-sm text-slate-300">
           <p>Status: <span className="text-white">{statusText[state]}</span></p>
           <p>Gas asset: native USDC, not ETH.</p>
-          <p>Deploy result is saved to this browser after the wallet transaction is confirmed.</p>
-          <p>Owner and royalty receiver use the connected wallet when left blank.</p>
+          <p>Public mint is enabled by default with 0 mint price and 5 max per wallet.</p>
+          <p>Owner and royalty receiver use the connected wallet.</p>
         </Card>
       </div>
     </AppShell>
@@ -307,6 +329,33 @@ export function MintPage() {
   const siteCollectionAddress = normalizeConfiguredAddress(VEXORA_CREATOR_COLLECTION.contractAddress);
   const [quantity, setQuantity] = useState("1");
   const [state, setState] = useState<OperationState>("idle");
+  const [mintedSupply, setMintedSupply] = useState(0);
+
+  async function readMintedSupply() {
+    if (!publicClient || !siteCollectionAddress) return 0;
+    const totalMinted = await publicClient
+      .readContract({ address: siteCollectionAddress, abi: erc721Abi, functionName: "totalMinted" })
+      .catch(() => BigInt(0));
+    return Number(totalMinted);
+  }
+
+  useEffect(() => {
+    let active = true;
+    if (!publicClient || !siteCollectionAddress) {
+      return;
+    }
+    void publicClient
+      .readContract({ address: siteCollectionAddress, abi: erc721Abi, functionName: "totalMinted" })
+      .then((totalMinted) => {
+        if (active) setMintedSupply(Number(totalMinted));
+      })
+      .catch(() => {
+        if (active) setMintedSupply(0);
+      });
+    return () => {
+      active = false;
+    };
+  }, [publicClient, siteCollectionAddress]);
 
   async function mintNft() {
     try {
@@ -328,6 +377,7 @@ export function MintPage() {
       });
       setState("transaction_pending");
       await publicClient.waitForTransactionReceipt({ hash });
+      setMintedSupply(await readMintedSupply());
       const activity: Activity = {
         id: makeId("mint"),
         walletAddress: address,
@@ -357,7 +407,13 @@ export function MintPage() {
             <Image src={VEXORA_CREATOR_COLLECTION.image} alt="Vexora Test Mint" width={720} height={420} className="h-56 w-full object-cover" />
             <div className="grid gap-2 p-4">
               <h2 className="text-xl font-semibold text-white">{VEXORA_CREATOR_COLLECTION.name}</h2>
-              <p className="text-sm text-slate-300">Supply {VEXORA_CREATOR_COLLECTION.maxSupply.toLocaleString()} - mint price 0, network fee only.</p>
+              <div className="grid gap-2 text-sm text-slate-300">
+                <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full bg-cyan-200" style={{ width: `${Math.min((mintedSupply / VEXORA_CREATOR_COLLECTION.maxSupply) * 100, 100)}%` }} />
+                </div>
+                <p>{Math.max(VEXORA_CREATOR_COLLECTION.maxSupply - mintedSupply, 0).toLocaleString()} left from {VEXORA_CREATOR_COLLECTION.maxSupply.toLocaleString()}</p>
+                <p>Total minted: <span className="text-white">{mintedSupply.toLocaleString()}</span></p>
+              </div>
               <Button onClick={mintNft} disabled={!siteCollectionAddress || state === "loading" || state === "wallet_confirmation" || state === "transaction_pending"}>
                 Mint Test NFT
               </Button>
@@ -369,7 +425,7 @@ export function MintPage() {
         <Card className="grid gap-3 text-sm text-slate-300">
           <p>Status: <span className="text-white">{statusText[state]}</span></p>
           <p>Vexora collection: <span className="text-white">{siteCollectionAddress ? shortAddress(siteCollectionAddress) : "preparing"}</span></p>
-          <p>Every successful mint records the transaction hash and contract address in the connected wallet profile.</p>
+          <p>Mint price: <span className="text-white">0</span>, network fee only.</p>
         </Card>
       </div>
     </AppShell>
